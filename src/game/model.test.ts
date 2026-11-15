@@ -63,6 +63,31 @@ function createEnemyTestState(): GameState {
 }
 
 describe('gameReducer', () => {
+  it('hides the starting marker after the first valid player move', () => {
+    const initialState = createInitialGameState(0)
+    expect(initialState.hasPlayerIssuedMove).toBe(false)
+
+    const rejectedMove = gameReducer(initialState, {
+      type: 'send',
+      fromId: 'home',
+      toId: 'home',
+      faction: 'player',
+      troopsToSend: 10,
+      now: 0,
+    })
+    expect(rejectedMove.hasPlayerIssuedMove).toBe(false)
+
+    const playerMove = gameReducer(initialState, {
+      type: 'send',
+      fromId: 'home',
+      toId: 'west',
+      faction: 'player',
+      troopsToSend: 10,
+      now: 0,
+    })
+    expect(playerMove.hasPlayerIssuedMove).toBe(true)
+  })
+
   it('produces troops for player and enemy territories but not neutral ones', () => {
     const initialState = createInitialGameState(0)
     expect(initialState.territories.every((territory) => territory.troops === 10)).toBe(true)
@@ -109,18 +134,70 @@ describe('gameReducer', () => {
       now: 0,
     })
 
-    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(9)
-    expect(state.movements.map(({ troops }) => troops)).toEqual([5])
-    expect(state.dispatches[0]).toMatchObject({ remainingTroops: 9, nextLaunchAt: 250 })
+    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(14)
+    expect(state.movements).toHaveLength(0)
+    expect(state.dispatches[0]).toMatchObject({ remainingTroops: 14, nextLaunchAt: 250 })
 
     state = gameReducer(state, { type: 'tick', now: 250 })
+    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(9)
+    expect(state.movements.map(({ troops }) => troops)).toEqual([5])
+
+    state = gameReducer(state, { type: 'tick', now: 500 })
     expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(4)
     expect(state.movements.map(({ troops }) => troops)).toEqual([5, 5])
 
-    state = gameReducer(state, { type: 'tick', now: 500 })
+    state = gameReducer(state, { type: 'tick', now: 750 })
     expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(0)
     expect(state.movements.map(({ troops }) => troops)).toEqual([5, 5, 4])
     expect(state.dispatches).toHaveLength(0)
+  })
+
+  it('splits remaining troops across a second dispatch from the same territory', () => {
+    let state = gameReducer(createWaveTestState(100, 0, 'player'), {
+      type: 'send',
+      fromId: 'home',
+      toId: 'west',
+      faction: 'player',
+      troopsToSend: 100,
+      now: 0,
+    })
+    state = gameReducer(state, { type: 'tick', now: 1000 })
+    state = updateTerritory(state, 'east', {
+      faction: 'player',
+      troops: 0,
+      x: 50,
+      y: 50,
+    })
+
+    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(80)
+    state = gameReducer(state, {
+      type: 'send',
+      fromId: 'home',
+      toId: 'east',
+      faction: 'player',
+      troopsToSend: 80,
+      now: 1000,
+    })
+
+    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(80)
+    expect(state.dispatches.map(({ toId, remainingTroops }) => [toId, remainingTroops]))
+      .toEqual([['west', 40], ['east', 40]])
+    expect(new Set(state.dispatches.map(({ nextLaunchAt }) => nextLaunchAt)))
+      .toEqual(new Set([1250]))
+
+    state = gameReducer(state, { type: 'tick', now: 1250 })
+    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(70)
+    state = gameReducer(state, { type: 'tick', now: 3000 })
+    const troopsSentTo = (territoryId: string) =>
+      (state.territories.find(({ id }) => id === territoryId)?.troops ?? 0) +
+      state.movements
+        .filter((movement) => movement.toId === territoryId)
+        .reduce((total, movement) => total + movement.troops, 0)
+
+    expect(state.dispatches).toHaveLength(0)
+    expect(troopsSentTo('west')).toBe(60)
+    expect(troopsSentTo('east')).toBe(40)
+    expect(state.productionNextAt.home).toBe(4000)
   })
 
   it('pauses source production during dispatch and resumes one second after the last wave', () => {
@@ -139,7 +216,10 @@ describe('gameReducer', () => {
     state = gameReducer(state, { type: 'tick', now: 1499 })
     expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(0)
 
-    state = gameReducer(state, { type: 'tick', now: 1500 })
+    state = gameReducer(state, { type: 'tick', now: 1749 })
+    expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(0)
+
+    state = gameReducer(state, { type: 'tick', now: 1750 })
     expect(state.territories.find(({ id }) => id === 'home')?.troops).toBe(1)
   })
 
@@ -152,7 +232,7 @@ describe('gameReducer', () => {
       troopsToSend: 14,
       now: 0,
     })
-    state = gameReducer(state, { type: 'tick', now: 1200 })
+    state = gameReducer(state, { type: 'tick', now: 1450 })
 
     expect(state.territories.find(({ id }) => id === 'west')).toMatchObject({
       faction: 'player',
@@ -169,7 +249,7 @@ describe('gameReducer', () => {
       troopsToSend: 14,
       now: 0,
     })
-    state = gameReducer(state, { type: 'tick', now: 1200 })
+    state = gameReducer(state, { type: 'tick', now: 1450 })
 
     expect(state.territories.find(({ id }) => id === 'west')).toMatchObject({
       faction: 'neutral',
@@ -186,7 +266,7 @@ describe('gameReducer', () => {
       troopsToSend: 14,
       now: 0,
     })
-    reinforcedState = gameReducer(reinforcedState, { type: 'tick', now: 1200 })
+    reinforcedState = gameReducer(reinforcedState, { type: 'tick', now: 1450 })
     expect(reinforcedState.territories.find(({ id }) => id === 'west')?.troops).toBe(19)
 
     const initialState = createInitialGameState(0)
@@ -212,9 +292,13 @@ describe('gameReducer', () => {
       troopsToSend: 2,
       now: 0,
     })
-    const victory = gameReducer(finalAttack, {
+    const attackLaunched = gameReducer(finalAttack, {
       type: 'tick',
-      now: finalAttack.movements[0].arrivesAt,
+      now: finalAttack.dispatches[0].nextLaunchAt,
+    })
+    const victory = gameReducer(attackLaunched, {
+      type: 'tick',
+      now: attackLaunched.movements[0].arrivesAt,
     })
 
     expect(victory.result).toBe('player')
@@ -245,6 +329,7 @@ describe('gameReducer', () => {
       troopsToSend: 1,
       now: 0,
     })
+    state = gameReducer(state, { type: 'tick', now: state.dispatches[0].nextLaunchAt })
     const defeat = gameReducer(state, { type: 'tick', now: state.movements[0].arrivesAt })
 
     expect(defeat.result).toBe('enemy')
@@ -254,7 +339,7 @@ describe('gameReducer', () => {
 describe('stage campaign', () => {
   it.each(STAGE_DEFINITIONS)(
     'creates stage $stage with the configured territory and AI counts',
-    ({ stage, territoryCount, enemyCount }) => {
+    ({ stage, territoryCount, enemyCount, turretCount }) => {
       const state = createInitialGameState(0, undefined, stage, () => 0.37)
       const enemyTerritories = state.territories.filter(
         (territory) => territory.faction === 'enemy',
@@ -267,9 +352,7 @@ describe('stage campaign', () => {
       expect(state.enemyStartingTroops).toBe(10 + enemyUpgradeLevel * 2)
       expect(state.enemyProductionTenths).toBe(10 + enemyUpgradeLevel)
       expect(state.enemyCapacity).toBe(50 + enemyUpgradeLevel)
-      expect(state.territories.filter(({ isTurret }) => isTurret)).toHaveLength(
-        stage === 8 ? 1 : 0,
-      )
+      expect(state.territories.filter(({ isTurret }) => isTurret)).toHaveLength(turretCount)
       for (let first = 0; first < territories.length; first += 1) {
         for (let second = first + 1; second < territories.length; second += 1) {
           expect(Math.hypot(
@@ -292,7 +375,7 @@ describe('stage campaign', () => {
         seed = (seed * 1664525 + 1013904223) % 4294967296
         return seed / 4294967296
       }
-      const territories = createInitialGameState(0, undefined, 8, random).territories
+      const territories = createInitialGameState(0, undefined, 7, random).territories
 
       expect(new Set(territories.map(({ x }) => x)).size).toBeGreaterThan(10)
       expect(new Set(territories.map(({ y }) => y)).size).toBeGreaterThan(10)
@@ -324,7 +407,7 @@ describe('stage campaign', () => {
       troopsToSend: 20,
       now: 0,
     })
-    state = gameReducer(state, { type: 'tick', now: 500 })
+    state = gameReducer(state, { type: 'tick', now: 1000 })
     const lastArrival = Math.max(...state.movements.map(({ arrivesAt }) => arrivesAt))
     const resolved = gameReducer(state, { type: 'tick', now: lastArrival })
 
@@ -348,7 +431,11 @@ describe('stage campaign', () => {
     expect(awardGameReward({ ...startingProfile, currentStage: 7 }, 'player')
       .profile.currentStage).toBe(8)
     expect(awardGameReward({ ...startingProfile, currentStage: 8 }, 'player')
-      .profile.currentStage).toBe(8)
+      .profile.currentStage).toBe(9)
+    expect(
+      awardGameReward({ ...startingProfile, currentStage: STAGE_DEFINITIONS.length }, 'player')
+        .profile.currentStage,
+    ).toBe(STAGE_DEFINITIONS.length)
   })
 
   it('pauses troop movement and production while shifting scheduled times on resume', () => {
@@ -360,13 +447,14 @@ describe('stage campaign', () => {
       troopsToSend: 10,
       now: 0,
     })
+    state = gameReducer(state, { type: 'tick', now: 250 })
     const originalArrivalAt = state.movements[0].arrivesAt
 
     state = gameReducer(state, { type: 'resume', now: 1000, pausedAt: 200 })
 
-    expect(state.movements[0].startedAt).toBe(800)
+    expect(state.movements[0].startedAt).toBe(1050)
     expect(state.movements[0].arrivesAt).toBe(originalArrivalAt + 800)
-    expect(state.dispatches[0].nextLaunchAt).toBe(1050)
+    expect(state.dispatches[0].nextLaunchAt).toBe(1300)
     expect(state.productionNextAt.home).toBe(1800)
   })
 })
@@ -593,7 +681,7 @@ describe('movement collisions', () => {
       troopsToSend: 1,
       now: 0,
     })
-    state = gameReducer(state, { type: 'tick', now: 1550 })
+    state = gameReducer(state, { type: 'tick', now: 1800 })
 
     expect(state.movements).toHaveLength(1)
     expect(state.movements[0]).toMatchObject({ faction: 'player', troops: 2 })

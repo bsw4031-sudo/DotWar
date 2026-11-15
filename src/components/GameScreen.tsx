@@ -112,6 +112,7 @@ function GameScreen({
         </div>
         <TerritoryMap
           territories={gameState.territories}
+          hasPlayerIssuedMove={gameState.hasPlayerIssuedMove}
           capacityByFaction={capacityByFaction}
           links={gameState.links}
           movements={gameState.movements}

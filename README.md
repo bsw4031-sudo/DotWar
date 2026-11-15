@@ -19,13 +19,17 @@ Vite + React + TypeScript starter for a portrait-first territory strategy game.
   between any pair takes at least 1.5 seconds at the default speed and their
   circles stay apart. Territories start with 10 troops by default; the
   player's home uses its upgraded garrison value.
+- A blinking yellow marker identifies the player's home until the first move
+  is ordered.
 - Player territories (red) use the upgraded production rate and capacity.
   Enemy AIs receive one additional garrison, production, and capacity upgrade
   per stage after stage 1; each AI has a distinct color. Neutral territories
   (gray) do not produce troops.
 - Production stops when a territory reaches its capacity, shown by a pause icon.
-- Player orders send all troops from the source. The first wave leaves
-  immediately; remaining troops launch in groups of up to five every 250 ms.
+- Player orders send all troops from the source in groups of up to five every
+  250 ms, beginning 250 ms after the order. A new order while troops are queued
+  divides the remaining troops evenly across the active destinations, which
+  doubles the departure rate for two destinations.
 - The source troop count falls with each departing wave. Production pauses while
   a source has troops queued to leave, then resumes one second after the last
   wave departs.

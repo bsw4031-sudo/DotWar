@@ -51,6 +51,7 @@ export interface TroopDispatch {
 export interface GameState {
   stage: number
   territories: Territory[]
+  hasPlayerIssuedMove: boolean
   links: TerritoryLink[]
   movements: TroopMovement[]
   dispatches: TroopDispatch[]
@@ -138,9 +139,14 @@ export const STAGE_DEFINITIONS: StageDefinition[] = [
   { stage: 3, territoryCount: 9, enemyCount: 2, turretCount: 0 },
   { stage: 4, territoryCount: 10, enemyCount: 2, turretCount: 0 },
   { stage: 5, territoryCount: 12, enemyCount: 3, turretCount: 0 },
-  { stage: 6, territoryCount: 13, enemyCount: 4, turretCount: 0 },
+  { stage: 6, territoryCount: 13, enemyCount: 3, turretCount: 0 },
   { stage: 7, territoryCount: 15, enemyCount: 4, turretCount: 0 },
-  { stage: 8, territoryCount: 15, enemyCount: 4, turretCount: 1 },
+  { stage: 8, territoryCount: 7, enemyCount: 1, turretCount: 1 },
+  { stage: 9, territoryCount: 9, enemyCount: 1, turretCount: 1 },
+  { stage: 10, territoryCount: 10, enemyCount: 2, turretCount: 1 },
+  { stage: 11, territoryCount: 12, enemyCount: 2, turretCount: 1 },
+  { stage: 12, territoryCount: 14, enemyCount: 3, turretCount: 1 },
+  { stage: 13, territoryCount: 16, enemyCount: 3, turretCount: 1 },
 ]
 export const FACTION_LABELS: Record<Faction, string> = {
   player: '아군',
@@ -183,6 +189,7 @@ const TERRITORY_TEMPLATES: TerritoryTemplate[] = [
   { id: 'enemy-4', name: '전초 4', faction: 'enemy', aiId: 4, isTurret: false },
   { id: 'outpost-west', name: '서초소', faction: 'neutral', aiId: null, isTurret: false },
   { id: 'outpost-east', name: '동초소', faction: 'neutral', aiId: null, isTurret: false },
+  { id: 'outpost-north', name: '북초소', faction: 'neutral', aiId: null, isTurret: false },
 ]
 
 const MAP_POSITION_SLOTS: MapPoint[] = [
@@ -210,16 +217,26 @@ export function createInitialGameState(
   const enemyCapacity = DEFAULT_TROOP_CAPACITY + enemyLevel
   const territories = TERRITORY_TEMPLATES
     .slice(0, stageDefinition.territoryCount)
-    .map((template, index) => ({
-      ...template,
-      ...positions[index],
-      isTurret: template.id === 'center' && stageDefinition.turretCount > 0,
-      troops: template.faction === 'player'
-        ? settings.playerStartingTroops
-        : template.faction === 'enemy'
-          ? enemyStartingTroops
-          : 10,
-    }))
+    .map((template, index) => {
+      const isEnemy =
+        template.faction === 'enemy' &&
+        template.aiId !== null &&
+        template.aiId <= stageDefinition.enemyCount
+      const faction: Faction = isEnemy ? 'enemy' : template.faction === 'player' ? 'player' : 'neutral'
+      const aiId = isEnemy ? template.aiId : null
+      return {
+        ...template,
+        faction,
+        aiId,
+        ...positions[index],
+        isTurret: template.id === 'center' && stageDefinition.turretCount > 0,
+        troops: faction === 'player'
+          ? settings.playerStartingTroops
+          : faction === 'enemy'
+            ? enemyStartingTroops
+            : 10,
+      }
+    })
   const links = buildTerritoryLinks(territories)
   const productionNextAt = Object.fromEntries(
     territories
@@ -240,6 +257,7 @@ export function createInitialGameState(
   return {
     stage: stageDefinition.stage,
     territories,
+    hasPlayerIssuedMove: false,
     links,
     movements: [],
     dispatches: [],
@@ -651,8 +669,10 @@ function advanceGame(state: GameState, now: number): GameState {
     if (remainingTroops > 0 && sourceTroops > 0) {
       pendingDispatches.push({ ...dispatch, remainingTroops, nextLaunchAt })
     } else {
-      productionNextAt[source.id] =
-        (lastLaunchAt ?? now) + TROOP_PRODUCTION_INTERVAL_MS
+      productionNextAt[source.id] = Math.max(
+        productionNextAt[source.id] ?? 0,
+        (lastLaunchAt ?? now) + TROOP_PRODUCTION_INTERVAL_MS,
+      )
     }
   }
   dispatches = pendingDispatches
@@ -681,18 +701,17 @@ function advanceGame(state: GameState, now: number): GameState {
       productionNextAt[updatedTerritory.id] = now + TROOP_PRODUCTION_INTERVAL_MS
       productionRemainderTenths[updatedTerritory.id] = 0
     } else if (updatedTerritory.troops < previousTerritory.troops) {
-      const activeDispatch = dispatches.find((dispatch) => dispatch.fromId === updatedTerritory.id)
-      if (activeDispatch && updatedTerritory.troops < activeDispatch.remainingTroops) {
-        const remainingTroops = updatedTerritory.troops
-        if (remainingTroops === 0) {
-          dispatches = dispatches.filter((dispatch) => dispatch.id !== activeDispatch.id)
+      const activeDispatches = dispatches.filter(
+        (dispatch) => dispatch.fromId === updatedTerritory.id,
+      )
+      if (activeDispatches.length > 0) {
+        dispatches = reallocateDispatches(
+          dispatches,
+          updatedTerritory.id,
+          updatedTerritory.troops,
+        )
+        if (!dispatches.some((dispatch) => dispatch.fromId === updatedTerritory.id)) {
           productionNextAt[updatedTerritory.id] = now + TROOP_PRODUCTION_INTERVAL_MS
-        } else {
-          dispatches = dispatches.map((dispatch) =>
-            dispatch.id === activeDispatch.id
-              ? { ...dispatch, remainingTroops }
-              : dispatch,
-          )
         }
       }
     }
@@ -785,55 +804,77 @@ function startDispatch(
     (source.faction === 'enemy' && source.aiId !== aiId) ||
     !Number.isInteger(action.troopsToSend) ||
     action.troopsToSend < 1 ||
-    source.troops < action.troopsToSend ||
-    state.dispatches.some((dispatch) => dispatch.fromId === source.id)
+    source.troops < action.troopsToSend
   ) {
     return state
   }
 
-  const firstWaveTroops = Math.min(TROOPS_PER_WAVE, action.troopsToSend)
-  const remainingTroops = action.troopsToSend - firstWaveTroops
+  const newDispatch: TroopDispatch = {
+    id: state.nextDispatchId,
+    fromId: source.id,
+    toId: target.id,
+    faction: action.faction,
+    aiId,
+    remainingTroops: action.troopsToSend,
+    nextLaunchAt: action.now + TROOP_WAVE_INTERVAL_MS,
+  }
+  const reallocatedDispatches = reallocateDispatches(
+    [...state.dispatches, newDispatch],
+    source.id,
+    action.troopsToSend,
+    newDispatch.id,
+  ).map((dispatch) =>
+    dispatch.fromId === source.id
+      ? { ...dispatch, nextLaunchAt: newDispatch.nextLaunchAt }
+      : dispatch,
+  )
+  const allocatedNewDispatch = reallocatedDispatches.find(
+    (dispatch) => dispatch.id === newDispatch.id,
+  )
+  if (!allocatedNewDispatch) return state
+
   return {
     ...state,
-    territories: state.territories.map((territory) =>
-      territory.id === source.id
-        ? { ...territory, troops: territory.troops - firstWaveTroops }
-        : territory,
-    ),
-    movements: [
-      ...state.movements,
-      createMovement(
-        state.nextMovementId,
-        source.id,
-        target.id,
-        action.faction,
-        aiId,
-        firstWaveTroops,
-        source,
-        target,
-        state.nextTroopId,
-        action.now,
-      ),
-    ],
-    dispatches: remainingTroops > 0
-      ? [
-          ...state.dispatches,
-          {
-            id: state.nextDispatchId,
-            fromId: source.id,
-            toId: target.id,
-            faction: action.faction,
-            aiId,
-            remainingTroops,
-            nextLaunchAt: action.now + TROOP_WAVE_INTERVAL_MS,
-          },
-        ]
-      : state.dispatches,
-      simulationAt: action.now,
-    nextMovementId: state.nextMovementId + 1,
-    nextDispatchId: remainingTroops > 0 ? state.nextDispatchId + 1 : state.nextDispatchId,
-      nextTroopId: state.nextTroopId + firstWaveTroops,
+    hasPlayerIssuedMove: state.hasPlayerIssuedMove || action.faction === 'player',
+    dispatches: reallocatedDispatches,
+    simulationAt: action.now,
+    nextDispatchId: state.nextDispatchId + 1,
   }
+}
+
+/**
+ * Splits a source's remaining troops evenly across its active dispatches.
+ */
+function reallocateDispatches(
+  dispatches: TroopDispatch[],
+  sourceId: string,
+  totalTroops: number,
+  priorityDispatchId?: number,
+): TroopDispatch[] {
+  const sourceDispatches = dispatches.filter((dispatch) => dispatch.fromId === sourceId)
+  if (sourceDispatches.length === 0) return dispatches
+
+  const baseTroops = Math.floor(totalTroops / sourceDispatches.length)
+  const remainder = totalTroops % sourceDispatches.length
+  const priorityIndex = sourceDispatches.findIndex(
+    (dispatch) => dispatch.id === priorityDispatchId,
+  )
+  const troopAllocations = new Map<number, number>(
+    sourceDispatches.map((dispatch) => [dispatch.id, baseTroops]),
+  )
+  for (let index = 0; index < remainder; index += 1) {
+    const allocationIndex = (Math.max(0, priorityIndex) + index) % sourceDispatches.length
+    const dispatchId = sourceDispatches[allocationIndex].id
+    troopAllocations.set(dispatchId, (troopAllocations.get(dispatchId) ?? 0) + 1)
+  }
+
+  return dispatches.flatMap((dispatch) => {
+    if (dispatch.fromId !== sourceId) return [dispatch]
+    const remainingTroops = troopAllocations.get(dispatch.id) ?? 0
+    return remainingTroops > 0
+      ? [{ ...dispatch, remainingTroops }]
+      : []
+  })
 }
 
 /**

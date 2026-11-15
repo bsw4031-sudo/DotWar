@@ -6,7 +6,6 @@ import type { Territory } from '../game/model'
 // === 2. 타입 및 상수 영역 ===
 interface UseTerritoryDragOptions {
   territories: Territory[]
-  dispatchingSourceIds: string[]
   hasMovements: boolean
   isPaused: boolean
   onSelectTerritory: (territoryId: string) => void
@@ -21,7 +20,6 @@ interface MapPoint {
 // === 3. 훅 선언부 ===
 function useTerritoryDrag({
   territories,
-  dispatchingSourceIds,
   hasMovements,
   isPaused,
   onSelectTerritory,
@@ -83,11 +81,7 @@ function useTerritoryDrag({
     if (event.button !== 0) return
     const territoryId = getTerritoryId(event.target)
     const territory = territories.find((item) => item.id === territoryId)
-    if (
-      !territory ||
-      territory.faction !== 'player' ||
-      dispatchingSourceIds.includes(territory.id)
-    ) {
+    if (!territory || territory.faction !== 'player') {
       return
     }
 

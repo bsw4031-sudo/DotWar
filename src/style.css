@@ -713,6 +713,23 @@ h1 span {
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
+.start-point-marker {
+  position: absolute;
+  top: calc(50% - 44px);
+  left: 50%;
+  z-index: 3;
+  width: 36px;
+  height: 26px;
+  transform: translateX(-50%);
+  fill: #fff000;
+  stroke: #fff;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgb(255 240 0 / 55%));
+  animation: start-point-blink 800ms ease-in-out infinite;
+  pointer-events: none;
+}
+
 .territory-node.is-turret .territory-node-glow {
   border-radius: 0;
   clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
@@ -1106,6 +1123,10 @@ h1 span {
 
 @keyframes dispatch-pulse {
   to { transform: translate(-50%, -50%) scale(1.16); }
+}
+
+@keyframes start-point-blink {
+  50% { opacity: 0.2; }
 }
 
 @media (max-height: 700px) {

@@ -10,6 +10,7 @@ import type { Territory, TerritoryLink, TroopMovement } from '../game/model'
 // === 2. 타입 및 상수 영역 ===
 interface TerritoryMapProps {
   territories: Territory[]
+  hasPlayerIssuedMove: boolean
   capacityByFaction: Record<'player' | 'enemy', number>
   links: TerritoryLink[]
   movements: TroopMovement[]
@@ -23,6 +24,7 @@ interface TerritoryMapProps {
 // === 3. 컴포넌트 선언부 ===
 function TerritoryMap({
   territories,
+  hasPlayerIssuedMove,
   capacityByFaction,
   links,
   movements,
@@ -43,7 +45,6 @@ function TerritoryMap({
     handleTerritoryClick,
   } = useTerritoryDrag({
     territories,
-    dispatchingSourceIds,
     hasMovements: movements.length > 0,
     isPaused,
     onSelectTerritory,
@@ -181,12 +182,20 @@ function TerritoryMap({
             ].filter(Boolean).join(' ')}
             style={{ left: `${territory.x}%`, top: `${territory.y}%` }}
             data-territory-id={territory.id}
-            disabled={isDispatching}
             onClick={() => handleTerritoryClick(territory.id)}
             aria-label={`${territory.name}, ${factionLabel}${territory.isTurret ? ', 포탑 영토' : ''}, 병력 ${territory.troops}${isDispatching ? ', 출정 중' : ''}${isProductionPaused ? ', 생산 정지' : ''}`}
             aria-pressed={selectedSourceId === territory.id}
             title={territory.name}
           >
+            {territory.id === 'home' && !hasPlayerIssuedMove && (
+              <svg
+                className="start-point-marker"
+                viewBox="0 0 100 70"
+                aria-hidden="true"
+              >
+                <path d="M4 4H96L50 66Z" />
+              </svg>
+            )}
             <span className="territory-node-glow" />
             {territory.isTurret && (
               <svg className="turret-emblem" viewBox="0 0 64 64" aria-hidden="true">

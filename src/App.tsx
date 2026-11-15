@@ -249,7 +249,6 @@ function App() {
     if (!territory) return
 
     if (territory.faction === 'player') {
-      if (gameState.dispatches.some((item) => item.fromId === territory.id)) return
       setSelectedSourceId((currentId) => currentId === territoryId ? null : territoryId)
       return
     }
