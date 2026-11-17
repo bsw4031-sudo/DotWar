@@ -1,4 +1,9 @@
 // === 1. Import 영역 ===
+/**
+ * @file useTerritoryDrag.ts
+ * @title 영토 드래그 훅
+ * @description 포인터 입력을 영토 선택과 병력 이동 동작으로 처리합니다.
+ */
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
 import type { Territory } from '../game/model'

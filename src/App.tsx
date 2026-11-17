@@ -1,10 +1,18 @@
 // === 1. Import 영역 ===
+/**
+ * @file App.tsx
+ * @title DotWar 앱 루트
+ * @description 게임 화면과 플레이 상태, 메뉴 동작을 관리합니다.
+ */
 import { useEffect, useReducer, useRef, useState } from 'react'
 import GameScreen from './components/GameScreen'
 import MenuOverlay from './components/MenuOverlay'
 import UpgradeScreen from './components/UpgradeScreen'
+import TutorialOverlay from './components/TutorialOverlay'
+import TurretTutorialOverlay from './components/TurretTutorialOverlay'
 import {
   awardGameReward,
+  DEFAULT_PLAYER_PROFILE,
   getGameSettings,
   loadPlayerProfile,
   purchaseUpgrade,
@@ -17,12 +25,15 @@ import {
   getEnemyMoves,
 } from './game/model'
 import { playSoundEffect } from './game/sound'
+import { supabase } from './supabaseClient'
 
 // === 2. 타입 및 상수 영역 ===
 type ActiveScreen = 'setup' | 'game'
 
 const ENEMY_TURN_MS = 2500
 const GAME_TICK_MS = 50
+const BASIC_TUTORIAL_STAGE = 1
+const TURRET_TUTORIAL_STAGE = 8
 
 // === 3. 컴포넌트 선언부 ===
 function App() {
@@ -34,6 +45,8 @@ function App() {
   const [profileState, setProfileState] = useState(loadPlayerProfile)
   const [screen, setScreen] = useState<ActiveScreen>('setup')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [tutorialPage, setTutorialPage] = useState<1 | 2 | null>(null)
+  const [turretGuidePage, setTurretGuidePage] = useState<1 | 2 | null>(null)
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [earnedCredits, setEarnedCredits] = useState<number | null>(null)
   const gameStateRef = useRef(gameState)
@@ -53,7 +66,7 @@ function App() {
 
   // === 4. 이펙트 영역 ===
   useEffect(() => {
-    if (screen !== 'game' || gameState.result || isMenuOpen) return
+    if (screen !== 'game' || gameState.result || isMenuOpen || tutorialPage !== null || turretGuidePage !== null) return
     const timer = window.setInterval(
       () => {
         if (!gamePausedRef.current) dispatch({ type: 'tick', now: Date.now() })
@@ -61,10 +74,10 @@ function App() {
       GAME_TICK_MS,
     )
     return () => window.clearInterval(timer)
-  }, [screen, gameState.result, isMenuOpen])
+  }, [screen, gameState.result, isMenuOpen, tutorialPage, turretGuidePage])
 
   useEffect(() => {
-    if (screen !== 'game' || gameState.result || isMenuOpen) return
+    if (screen !== 'game' || gameState.result || isMenuOpen || tutorialPage !== null || turretGuidePage !== null) return
     const timer = window.setInterval(() => {
       if (gamePausedRef.current) return
       const now = Date.now()
@@ -78,7 +91,7 @@ function App() {
       })
     }, ENEMY_TURN_MS)
     return () => window.clearInterval(timer)
-  }, [screen, gameState.result, isMenuOpen])
+  }, [screen, gameState.result, isMenuOpen, tutorialPage, turretGuidePage])
 
   useEffect(() => {
     if (screen !== 'game' || !gameState.result || rewardedGameRef.current) return
@@ -188,24 +201,63 @@ function App() {
     handleProfileChange({ ...profile, soundEnabled })
   }
 
+  /** Restores all saved and in-memory game progress to its default state. */
+  function handleResetProgress(): void {
+    const resetProfile = {
+      ...DEFAULT_PLAYER_PROFILE,
+      upgrades: { ...DEFAULT_PLAYER_PROFILE.upgrades },
+    }
+    handleProfileChange(resetProfile)
+    const now = Date.now()
+    dispatch({ type: 'reset', now, settings: getGameSettings(resetProfile), stage: 1 })
+    pauseStartedAtRef.current = null
+    gamePausedRef.current = false
+    rewardedGameRef.current = false
+    setTutorialPage(null)
+    setTurretGuidePage(null)
+    setSelectedSourceId(null)
+    setEarnedCredits(null)
+    setIsMenuOpen(false)
+    setScreen('setup')
+  }
+
+  async function handleSubmitFeedback(nickname: string, content: string): Promise<void> {
+    const { error } = await supabase.from('dotwar_feedbacks').insert({ nickname, content })
+    if (error) throw error
+  }
+
   /**
    * Starts a match using the current upgrade levels.
    */
   function handleStartGame(): void {
     rewardedGameRef.current = false
-    pauseStartedAtRef.current = null
-    gamePausedRef.current = false
+    const showTutorial = profile.currentStage === BASIC_TUTORIAL_STAGE
+    const showTurretGuide = profile.currentStage === TURRET_TUTORIAL_STAGE
+    const startedAt = Date.now()
+    pauseStartedAtRef.current = showTutorial || showTurretGuide ? startedAt : null
+    gamePausedRef.current = showTutorial || showTurretGuide
+    setTutorialPage(showTutorial ? 1 : null)
+    setTurretGuidePage(showTurretGuide ? 1 : null)
     setIsMenuOpen(false)
     setEarnedCredits(null)
     setSelectedSourceId(null)
     playSoundEffect(profile.soundEnabled, 'click')
     dispatch({
       type: 'reset',
-      now: Date.now(),
+      now: startedAt,
       settings: getGameSettings(profile),
       stage: profile.currentStage,
     })
     setScreen('game')
+  }
+
+  function handleFinishTutorial(): void {
+    const pausedAt = pauseStartedAtRef.current
+    if (pausedAt !== null) dispatch({ type: 'resume', pausedAt, now: Date.now() })
+    pauseStartedAtRef.current = null
+    gamePausedRef.current = false
+    setTutorialPage(null)
+    setTurretGuidePage(null)
   }
 
   /**
@@ -277,6 +329,8 @@ function App() {
             onToggleSound={handleToggleSound}
             onClose={handleCloseMenu}
             onGiveUp={handleGiveUp}
+            onSubmitFeedback={handleSubmitFeedback}
+            onResetProgress={handleResetProgress}
           />
         )}
       </>
@@ -291,7 +345,7 @@ function App() {
         earnedCredits={earnedCredits}
         creditBalance={profile.credits}
         playerCapacity={gameState.playerCapacity}
-        isPaused={isMenuOpen}
+        isPaused={isMenuOpen || tutorialPage !== null || turretGuidePage !== null}
         onOpenMenu={handleOpenMenu}
         onBackToSetup={handleBackToSetup}
         onSelectTerritory={handleSelectTerritory}
@@ -306,6 +360,22 @@ function App() {
           onToggleSound={handleToggleSound}
           onClose={handleCloseMenu}
           onGiveUp={handleGiveUp}
+          onSubmitFeedback={handleSubmitFeedback}
+          onResetProgress={handleResetProgress}
+        />
+      )}
+      {tutorialPage !== null && (
+        <TutorialOverlay
+          page={tutorialPage}
+          onNext={() => setTutorialPage(2)}
+          onStart={handleFinishTutorial}
+        />
+      )}
+      {turretGuidePage !== null && (
+        <TurretTutorialOverlay
+          page={turretGuidePage}
+          onNext={() => setTurretGuidePage(2)}
+          onStart={handleFinishTutorial}
         />
       )}
     </>

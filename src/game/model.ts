@@ -1,6 +1,11 @@
 // === 1. Import 영역 ===
 
 // === 2. 타입 및 상수 영역 ===
+/**
+ * @file model.ts
+ * @title 게임 규칙과 상태
+ * @description 전투 상태, 턴 진행, 이동 및 점령 규칙을 정의합니다.
+ */
 export type Faction = 'player' | 'enemy' | 'neutral'
 
 export interface Territory {
@@ -38,6 +43,14 @@ export interface TroopPosition {
   y: number
 }
 
+export interface TurretShot {
+  id: number
+  turretId: string
+  targetX: number
+  targetY: number
+  firedAt: number
+}
+
 export interface TroopDispatch {
   id: number
   fromId: string
@@ -63,6 +76,8 @@ export interface GameState {
   enemyProductionTenths: number
   enemyCapacity: number
   turretNextShotAt: Record<string, number>
+  turretShots: TurretShot[]
+  nextTurretShotId: number
   simulationAt: number
   nextMovementId: number
   nextDispatchId: number
@@ -147,6 +162,43 @@ export const STAGE_DEFINITIONS: StageDefinition[] = [
   { stage: 11, territoryCount: 12, enemyCount: 2, turretCount: 1 },
   { stage: 12, territoryCount: 14, enemyCount: 3, turretCount: 1 },
   { stage: 13, territoryCount: 16, enemyCount: 3, turretCount: 1 },
+  { stage: 14, territoryCount: 18, enemyCount: 4, turretCount: 1 },
+  { stage: 15, territoryCount: 20, enemyCount: 4, turretCount: 1 },
+  { stage: 16, territoryCount: 22, enemyCount: 5, turretCount: 1 },
+  { stage: 17, territoryCount: 24, enemyCount: 5, turretCount: 1 },
+  { stage: 18, territoryCount: 12, enemyCount: 1, turretCount: 2 },
+  { stage: 19, territoryCount: 14, enemyCount: 1, turretCount: 2 },
+  { stage: 20, territoryCount: 16, enemyCount: 2, turretCount: 2 },
+  { stage: 21, territoryCount: 18, enemyCount: 2, turretCount: 2 },
+  { stage: 22, territoryCount: 20, enemyCount: 3, turretCount: 2 },
+  { stage: 23, territoryCount: 22, enemyCount: 3, turretCount: 2 },
+  { stage: 24, territoryCount: 24, enemyCount: 4, turretCount: 2 },
+  { stage: 25, territoryCount: 26, enemyCount: 4, turretCount: 2 },
+  { stage: 26, territoryCount: 28, enemyCount: 5, turretCount: 2 },
+  { stage: 27, territoryCount: 30, enemyCount: 5, turretCount: 2 },
+  { stage: 28, territoryCount: 15, enemyCount: 1, turretCount: 3 },
+  { stage: 29, territoryCount: 17, enemyCount: 1, turretCount: 3 },
+  { stage: 30, territoryCount: 19, enemyCount: 2, turretCount: 3 },
+  { stage: 31, territoryCount: 21, enemyCount: 2, turretCount: 3 },
+  { stage: 32, territoryCount: 23, enemyCount: 3, turretCount: 3 },
+  { stage: 33, territoryCount: 25, enemyCount: 3, turretCount: 3 },
+  { stage: 34, territoryCount: 27, enemyCount: 4, turretCount: 3 },
+  { stage: 35, territoryCount: 29, enemyCount: 4, turretCount: 3 },
+  { stage: 36, territoryCount: 31, enemyCount: 5, turretCount: 3 },
+  { stage: 37, territoryCount: 33, enemyCount: 5, turretCount: 3 },
+  { stage: 38, territoryCount: 16, enemyCount: 1, turretCount: 4 },
+  { stage: 39, territoryCount: 18, enemyCount: 1, turretCount: 4 },
+  { stage: 40, territoryCount: 20, enemyCount: 2, turretCount: 4 },
+  { stage: 41, territoryCount: 22, enemyCount: 2, turretCount: 4 },
+  { stage: 42, territoryCount: 24, enemyCount: 3, turretCount: 4 },
+  { stage: 43, territoryCount: 26, enemyCount: 3, turretCount: 4 },
+  { stage: 44, territoryCount: 28, enemyCount: 4, turretCount: 4 },
+  { stage: 45, territoryCount: 30, enemyCount: 4, turretCount: 4 },
+  { stage: 46, territoryCount: 32, enemyCount: 5, turretCount: 4 },
+  { stage: 47, territoryCount: 34, enemyCount: 5, turretCount: 4 },
+  { stage: 48, territoryCount: 17, enemyCount: 1, turretCount: 5 },
+  { stage: 49, territoryCount: 19, enemyCount: 1, turretCount: 5 },
+  { stage: 50, territoryCount: 21, enemyCount: 2, turretCount: 5 },
 ]
 export const FACTION_LABELS: Record<Faction, string> = {
   player: '아군',
@@ -171,6 +223,8 @@ interface InterceptableTroop {
   movementId: number
   unitId: number
   distance: number
+  x: number
+  y: number
 }
 
 const TERRITORY_TEMPLATES: TerritoryTemplate[] = [
@@ -210,13 +264,25 @@ export function createInitialGameState(
   random: () => number = Math.random,
 ): GameState {
   const stageDefinition = getStageDefinition(stage)
-  const positions = getRandomizedPositions(stageDefinition.territoryCount, random)
-  const enemyLevel = Math.min(stageDefinition.stage - 1, 6)
-  const enemyStartingTroops = 10 + enemyLevel * 2
-  const enemyProductionTenths = DEFAULT_PRODUCTION_TENTHS + enemyLevel
-  const enemyCapacity = DEFAULT_TROOP_CAPACITY + enemyLevel
-  const territories = TERRITORY_TEMPLATES
-    .slice(0, stageDefinition.territoryCount)
+  const territoryTemplates = TERRITORY_TEMPLATES.slice(0, stageDefinition.territoryCount)
+  const centerTerritoryIndex = territoryTemplates.findIndex((template) => template.id === 'center')
+  const turretCandidates = territoryTemplates
+    .map((template, index) => ({ template, index }))
+    .filter(({ template, index }) => template.faction === 'neutral' && index !== centerTerritoryIndex)
+  const turretTerritoryIndices = [
+    ...(centerTerritoryIndex >= 0 ? [centerTerritoryIndex] : []),
+    ...turretCandidates.map(({ index }) => index),
+  ].slice(0, stageDefinition.turretCount)
+  const positions = getRandomizedPositions(
+    stageDefinition.territoryCount,
+    random,
+    turretTerritoryIndices,
+  )
+  const enemyStageLevel = stageDefinition.stage - 1
+  const enemyStartingTroops = 10 + Math.floor(enemyStageLevel / 5) * 5
+  const enemyProductionTenths = 9 + enemyStageLevel * 2
+  const enemyCapacity = DEFAULT_TROOP_CAPACITY + enemyStageLevel * 2
+  const territories = territoryTemplates
     .map((template, index) => {
       const isEnemy =
         template.faction === 'enemy' &&
@@ -229,7 +295,7 @@ export function createInitialGameState(
         faction,
         aiId,
         ...positions[index],
-        isTurret: template.id === 'center' && stageDefinition.turretCount > 0,
+        isTurret: turretTerritoryIndices.includes(index),
         troops: faction === 'player'
           ? settings.playerStartingTroops
           : faction === 'enemy'
@@ -269,6 +335,8 @@ export function createInitialGameState(
     enemyProductionTenths,
     enemyCapacity,
     turretNextShotAt,
+    turretShots: [],
+    nextTurretShotId: 1,
     simulationAt: now,
     nextMovementId: 1,
     nextDispatchId: 1,
@@ -288,7 +356,11 @@ export function getStageDefinition(stage: number): StageDefinition {
 /**
  * Places territories with randomized offsets while preserving minimum travel distance.
  */
-function getRandomizedPositions(count: number, random: () => number): MapPoint[] {
+function getRandomizedPositions(
+  count: number,
+  random: () => number,
+  turretIndices: number[],
+): MapPoint[] {
   for (let layoutAttempt = 0; layoutAttempt < 8; layoutAttempt += 1) {
     const availablePositions = [...MAP_POSITION_SLOTS]
     for (let index = availablePositions.length - 1; index > 0; index -= 1) {
@@ -297,19 +369,50 @@ function getRandomizedPositions(count: number, random: () => number): MapPoint[]
         [availablePositions[swapIndex], availablePositions[index]]
     }
 
-    const positions: MapPoint[] = []
+    const positions: Array<MapPoint | undefined> = new Array(count)
+    const placedPositions: MapPoint[] = []
     let hasValidLayout = true
-    for (const slot of availablePositions.slice(0, count)) {
+
+    // Place every turret in the central horizontal band before regular territories.
+    for (const territoryIndex of turretIndices) {
+      let foundTurretPosition = false
+      for (let positionAttempt = 0; positionAttempt < 600; positionAttempt += 1) {
+        const candidate = {
+          x: 35 + random() * 30,
+          y: 8 + random() * 84,
+        }
+        if (placedPositions.every((position) =>
+          Math.hypot(candidate.x - position.x, candidate.y - position.y) >= MIN_TERRITORY_DISTANCE,
+        )) {
+          positions[territoryIndex] = candidate
+          placedPositions.push(candidate)
+          foundTurretPosition = true
+          break
+        }
+      }
+      if (!foundTurretPosition) {
+        hasValidLayout = false
+        break
+      }
+    }
+    if (!hasValidLayout) continue
+
+    const regularTerritoryIndices = Array.from({ length: count }, (_, index) => index)
+      .filter((index) => !turretIndices.includes(index))
+    for (const [positionIndex, slot] of availablePositions
+      .slice(0, regularTerritoryIndices.length)
+      .entries()) {
       let foundPosition = false
       for (let positionAttempt = 0; positionAttempt < 300; positionAttempt += 1) {
         const candidate = {
           x: Math.max(12, Math.min(88, slot.x + (random() - 0.5) * 18)),
           y: Math.max(8, Math.min(92, slot.y + (random() - 0.5) * 16)),
         }
-        if (positions.every((position) =>
+        if (placedPositions.every((position) =>
           Math.hypot(candidate.x - position.x, candidate.y - position.y) >= MIN_TERRITORY_DISTANCE,
         )) {
-          positions.push(candidate)
+          positions[regularTerritoryIndices[positionIndex]] = candidate
+          placedPositions.push(candidate)
           foundPosition = true
           break
         }
@@ -321,10 +424,26 @@ function getRandomizedPositions(count: number, random: () => number): MapPoint[]
       }
     }
 
-    if (hasValidLayout) return positions
+    if (hasValidLayout) return positions as MapPoint[]
   }
 
-  return MAP_POSITION_SLOTS.slice(0, count)
+  const centralSlots = MAP_POSITION_SLOTS.filter((slot) => slot.x >= 35 && slot.x <= 65)
+  const regularSlots = MAP_POSITION_SLOTS.filter((slot) => slot.x < 35 || slot.x > 65)
+  const fallback: Array<MapPoint | undefined> = new Array(count)
+  const reservedTurretSlots = centralSlots.slice(0, turretIndices.length)
+  turretIndices.forEach((territoryIndex, index) => {
+    fallback[territoryIndex] = reservedTurretSlots[index]
+  })
+  const remainingSlots = [
+    ...regularSlots,
+    ...centralSlots.slice(turretIndices.length),
+  ].slice(0, count - turretIndices.length)
+  const regularTerritoryIndices = Array.from({ length: count }, (_, index) => index)
+    .filter((index) => !turretIndices.includes(index))
+  regularTerritoryIndices.forEach((territoryIndex, index) => {
+    fallback[territoryIndex] = remainingSlots[index]
+  })
+  return fallback as MapPoint[]
 }
 
 /**
@@ -722,6 +841,7 @@ function advanceGame(state: GameState, now: number): GameState {
     movements,
     turretNextShotAt,
     now,
+    state.nextTurretShotId,
   )
   movements = turretAttack.movements
   turretNextShotAt = turretAttack.turretNextShotAt
@@ -731,6 +851,7 @@ function advanceGame(state: GameState, now: number): GameState {
     const nextProductionAt = productionNextAt[territory.id]
     if (
       territory.faction === 'neutral' ||
+      territory.isTurret ||
       dispatchingTerritoryIds.has(territory.id) ||
       nextProductionAt === undefined ||
       nextProductionAt > now
@@ -779,6 +900,11 @@ function advanceGame(state: GameState, now: number): GameState {
     productionNextAt,
     productionRemainderTenths,
     turretNextShotAt,
+    turretShots: [
+      ...state.turretShots.filter((shot) => now - shot.firedAt < 420),
+      ...turretAttack.shots,
+    ],
+    nextTurretShotId: turretAttack.nextTurretShotId,
     simulationAt: now,
     nextMovementId,
     nextTroopId,
@@ -1055,9 +1181,17 @@ function interceptTroopsWithTurrets(
   movements: TroopMovement[],
   initialNextShotAt: Record<string, number>,
   now: number,
-): { movements: TroopMovement[]; turretNextShotAt: Record<string, number> } {
+  initialNextShotId: number,
+): {
+  movements: TroopMovement[]
+  turretNextShotAt: Record<string, number>
+  shots: TurretShot[]
+  nextTurretShotId: number
+} {
   let activeMovements = movements
   const turretNextShotAt = { ...initialNextShotAt }
+  const shots: TurretShot[] = []
+  let nextTurretShotId = initialNextShotId
 
   for (const turret of territories.filter((territory) => territory.isTurret)) {
     if ((turretNextShotAt[turret.id] ?? now + TURRET_ATTACK_INTERVAL_MS) > now) continue
@@ -1083,6 +1217,8 @@ function interceptTroopsWithTurrets(
             movementId: movement.id,
             unitId: position.unitId,
             distance,
+            x: position.x,
+            y: position.y,
           })
         }
       }
@@ -1096,6 +1232,15 @@ function interceptTroopsWithTurrets(
     )[0]
     if (!targetTroop) continue
 
+    shots.push({
+      id: nextTurretShotId,
+      turretId: turret.id,
+      targetX: targetTroop.x,
+      targetY: targetTroop.y,
+      firedAt: now,
+    })
+    nextTurretShotId += 1
+
     activeMovements = activeMovements.flatMap((movement) => {
       if (movement.id !== targetTroop.movementId) return [movement]
       const unitIds = movement.unitIds.filter((unitId) => unitId !== targetTroop.unitId)
@@ -1106,7 +1251,7 @@ function interceptTroopsWithTurrets(
     turretNextShotAt[turret.id] = now + TURRET_ATTACK_INTERVAL_MS
   }
 
-  return { movements: activeMovements, turretNextShotAt }
+  return { movements: activeMovements, turretNextShotAt, shots, nextTurretShotId }
 }
 
 /**

@@ -1,3 +1,8 @@
+/**
+ * @file style.css
+ * @title 앱 전역 스타일
+ * @description 게임 화면과 공용 컴포넌트의 레이아웃 및 디자인을 정의합니다.
+ */
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
@@ -685,6 +690,24 @@ h1 span {
   fill: #b76aff;
 }
 
+.turret-laser {
+  stroke: #fff02b;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px #ffdd22) drop-shadow(0 0 7px rgb(255 220 32 / 85%));
+  animation: turret-laser-fire 220ms ease-out both;
+}
+
+.turret-hit-flash {
+  fill: #fff8a6;
+  stroke: #ffdc25;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 5px #ffe431);
+  animation: turret-hit-burst 300ms ease-out both;
+}
+
 .territory-node {
   position: absolute;
   z-index: 2;
@@ -755,10 +778,10 @@ h1 span {
 }
 
 .turret-range {
-  fill: rgb(255 255 255 / 2%);
-  stroke: rgb(232 232 238 / 46%);
-  stroke-width: 0.45;
-  stroke-dasharray: 1.2 1.4;
+  fill: transparent;
+  stroke: #ffd43b;
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -923,6 +946,427 @@ h1 span {
 .result-eyebrow {
   margin: 0 0 8px;
   font-size: 8px;
+}
+
+.tutorial-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) 20px max(18px, env(safe-area-inset-bottom));
+  background: rgb(5 6 10 / 82%);
+  backdrop-filter: blur(6px);
+}
+
+.tutorial-dialog {
+  width: min(100%, 390px);
+  padding: 22px;
+  border: 1px solid #424550;
+  background: #17191f;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 50%);
+}
+
+.tutorial-eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.tutorial-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.tutorial-progress > span {
+  width: 22px;
+  height: 3px;
+  background: #3c3e48;
+}
+
+.tutorial-progress > span.is-current {
+  background: var(--accent);
+}
+
+.tutorial-progress small {
+  margin-left: auto;
+  color: #858791;
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.tutorial-scene {
+  position: relative;
+  height: 170px;
+  margin: 20px 0 22px;
+  overflow: hidden;
+  border: 1px solid #2c2f39;
+  background:
+    radial-gradient(#30333d 0.75px, transparent 0.75px),
+    #111319;
+  background-size: 18px 18px;
+}
+
+.tutorial-route {
+  position: absolute;
+  top: 50%;
+  left: 26%;
+  width: 48%;
+  border-top: 2px dashed #6b6e78;
+}
+
+.tutorial-node {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgb(255 255 255 / 60%);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.tutorial-ally {
+  left: 26%;
+  background: var(--player);
+  box-shadow: 0 0 20px rgb(240 84 66 / 35%);
+}
+
+.tutorial-enemy {
+  left: 74%;
+  background: var(--enemy);
+  box-shadow: 0 0 20px rgb(81 184 245 / 35%);
+}
+
+.tutorial-troop {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 26%;
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #fff;
+  border-radius: 50%;
+  background: var(--player);
+  box-shadow: 0 0 11px var(--player);
+}
+
+.tutorial-troop-one {
+  animation: tutorial-advance 2.4s ease-in-out infinite;
+}
+
+.tutorial-troop-two {
+  left: 74%;
+  background: var(--enemy);
+  box-shadow: 0 0 11px var(--enemy);
+  animation: tutorial-retreat 2.4s ease-in-out infinite;
+}
+
+.tutorial-clash {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  color: #fff3a0;
+  font-size: 26px;
+  opacity: 0;
+  text-shadow: 0 0 12px #ffd43b;
+  transform: translate(-50%, -50%) scale(0.5);
+  animation: tutorial-impact 2.4s ease-in-out infinite;
+}
+
+.tutorial-motion-label {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  color: #8b8e98;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.is-clash-demo .tutorial-troop-one,
+.is-clash-demo .tutorial-troop-two {
+  animation-duration: 2.4s;
+}
+
+.is-clash-demo .tutorial-troop-one {
+  animation-name: tutorial-clash-advance;
+}
+
+.is-clash-demo .tutorial-troop-two {
+  animation-name: tutorial-clash-retreat;
+}
+
+.tutorial-dialog h2 {
+  margin: 0 0 9px;
+  color: #f5f4f0;
+  font-size: 21px;
+  letter-spacing: -0.04em;
+}
+
+.tutorial-description {
+  min-height: 42px;
+  margin: 0 0 20px;
+  color: #b8bac2;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.tutorial-next-button {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  background: var(--accent);
+  color: #171911;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.turret-guide-scene {
+  position: relative;
+  height: 180px;
+  margin: 20px 0 22px;
+  overflow: hidden;
+  border: 1px solid #2c2f39;
+  background: radial-gradient(#30333d 0.75px, transparent 0.75px), #111319;
+  background-size: 18px 18px;
+}
+
+.turret-guide-range {
+  position: absolute;
+  top: calc(43% - 74px);
+  left: calc(50% - 74px);
+  width: 148px;
+  height: 148px;
+  border: 2px dashed #ffd43b;
+  border-radius: 50%;
+  background: rgb(255 212 59 / 4%);
+}
+
+.turret-guide-node {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgb(255 255 255 / 65%);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.turret-guide-ally {
+  top: 62%;
+  left: 17%;
+  background: var(--player);
+  box-shadow: 0 0 18px rgb(240 84 66 / 40%);
+}
+
+.turret-guide-enemy {
+  top: 54%;
+  left: 83%;
+  background: var(--enemy);
+  box-shadow: 0 0 18px rgb(81 184 245 / 40%);
+}
+
+.turret-guide-turret {
+  top: 43%;
+  left: 50%;
+  border-radius: 9px;
+  background: #858894;
+  box-shadow: 0 0 18px rgb(255 212 59 / 25%);
+}
+
+.turret-guide-page-2 .turret-guide-turret {
+  background: var(--player);
+  box-shadow: 0 0 18px rgb(240 84 66 / 45%);
+}
+
+.turret-guide-route {
+  position: absolute;
+  z-index: 1;
+  height: 0;
+  border-top: 1px dashed #686b76;
+  transform-origin: left center;
+}
+
+.turret-guide-route-ally {
+  top: 61%;
+  left: 18%;
+  width: 32%;
+  transform: rotate(-20deg);
+}
+
+.turret-guide-route-enemy {
+  top: 54%;
+  left: 51%;
+  width: 32%;
+  transform: rotate(10deg);
+}
+
+.turret-guide-troop {
+  position: absolute;
+  z-index: 4;
+  top: 62%;
+  left: 17%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #fff;
+  border-radius: 50%;
+  background: var(--player);
+  box-shadow: 0 0 9px var(--player);
+}
+
+.turret-guide-ally-troop {
+  animation: turret-guide-ally-move 3.2s ease-in-out infinite;
+}
+
+.turret-guide-enemy-troop {
+  top: 54%;
+  left: 83%;
+  background: var(--enemy);
+  box-shadow: 0 0 9px var(--enemy);
+}
+
+.turret-guide-laser {
+  position: absolute;
+  z-index: 3;
+  top: 43%;
+  left: 50%;
+  width: 11%;
+  height: 4px;
+  border-radius: 4px;
+  background: #fff02b;
+  box-shadow: 0 0 5px #fff02b, 0 0 12px #ffcf1a;
+  opacity: 0;
+  transform: rotate(72deg);
+  transform-origin: left center;
+  animation: turret-guide-laser-fire 3.2s ease-in-out infinite;
+}
+
+.turret-guide-impact {
+  position: absolute;
+  z-index: 5;
+  top: 54%;
+  left: 53%;
+  color: #fff5a1;
+  font-size: 24px;
+  opacity: 0;
+  text-shadow: 0 0 12px #ffda27;
+  transform: translate(-50%, -50%) scale(0.5);
+  animation: turret-guide-impact 3.2s ease-in-out infinite;
+}
+
+.turret-guide-caption {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  color: #a8aab2;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
+
+.turret-guide-page-2 .turret-guide-enemy-troop {
+  animation: turret-guide-enemy-move 4.2s ease-in-out infinite;
+}
+
+.turret-guide-page-2 .turret-guide-ally-troop {
+  animation: turret-guide-ally-follow 4.2s ease-in-out infinite;
+}
+
+.turret-guide-page-2 .turret-guide-laser {
+  animation: turret-guide-owned-fire 4.2s ease-in-out infinite;
+}
+
+.turret-guide-page-2 .turret-guide-impact {
+  animation: turret-guide-owned-impact 4.2s ease-in-out infinite;
+}
+
+@keyframes tutorial-advance {
+  0%, 10% { left: 26%; }
+  75%, 100% { left: 74%; }
+}
+
+@keyframes tutorial-retreat {
+  0%, 10% { left: 74%; }
+  75%, 100% { left: 26%; }
+}
+
+@keyframes tutorial-clash-advance {
+  0%, 10% { left: 26%; opacity: 1; }
+  52% { left: 50%; opacity: 1; }
+  60%, 88% { left: 50%; opacity: 0; }
+  100% { left: 26%; opacity: 1; }
+}
+
+@keyframes tutorial-clash-retreat {
+  0%, 10% { left: 74%; opacity: 1; }
+  52% { left: 50%; opacity: 1; }
+  60%, 88% { left: 50%; opacity: 0; }
+  100% { left: 74%; opacity: 1; }
+}
+
+@keyframes tutorial-impact {
+  0%, 58%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  66%, 78% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@keyframes turret-guide-ally-move {
+  0%, 8% { left: 17%; top: 62%; opacity: 1; }
+  56% { left: 53%; top: 54%; opacity: 1; }
+  63%, 80% { left: 53%; top: 54%; opacity: 0; }
+  100% { left: 17%; top: 62%; opacity: 1; }
+}
+
+@keyframes turret-guide-laser-fire {
+  0%, 42%, 65%, 100% { opacity: 0; }
+  48%, 58% { opacity: 1; }
+}
+
+@keyframes turret-guide-impact {
+  0%, 45%, 64%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  50%, 58% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@keyframes turret-guide-enemy-move {
+  0%, 7% { left: 83%; top: 54%; opacity: 1; }
+  38% { left: 53%; top: 54%; opacity: 1; }
+  44%, 52% { left: 53%; top: 54%; opacity: 0; }
+  60%, 100% { left: 83%; top: 54%; opacity: 1; }
+}
+
+@keyframes turret-guide-ally-follow {
+  0%, 51% { left: 17%; top: 62%; opacity: 0; }
+  57% { left: 17%; top: 62%; opacity: 1; }
+  94% { left: 83%; top: 54%; opacity: 1; }
+  100% { left: 17%; top: 62%; opacity: 0; }
+}
+
+@keyframes turret-guide-owned-fire {
+  0%, 8%, 42%, 100% { opacity: 0; }
+  16%, 36% { opacity: 1; }
+}
+
+@keyframes turret-guide-owned-impact {
+  0%, 12%, 40%, 100% { opacity: 0; }
+  18%, 34% { opacity: 1; }
 }
 
 .result-overlay h2 {
@@ -1116,6 +1560,86 @@ h1 span {
   color: #171911;
 }
 
+.feedback-instructions {
+  margin: -8px 0 18px;
+  color: #d0d1d6;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.feedback-form {
+  display: grid;
+  gap: 14px;
+}
+
+.feedback-form label {
+  display: grid;
+  gap: 7px;
+  color: #c5c6cc;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.feedback-form input,
+.feedback-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #393c47;
+  border-radius: 0;
+  background: #20222a;
+  color: #f5f4f0;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.feedback-form input:focus,
+.feedback-form textarea:focus {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
+.feedback-form .menu-storage-error {
+  margin: 0;
+}
+
+.feedback-form button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.feedback-success {
+  padding: 20px 0 8px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.reset-progress-warning {
+  margin: -8px 0 22px;
+  color: #ff9a8f;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.reset-progress-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.reset-progress-confirm-button {
+  min-height: 46px;
+  border: 1px solid rgb(240 84 66 / 45%);
+  background: rgb(240 84 66 / 16%);
+  color: #ff9a8f;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @keyframes menu-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1127,6 +1651,18 @@ h1 span {
 
 @keyframes start-point-blink {
   50% { opacity: 0.2; }
+}
+
+@keyframes turret-laser-fire {
+  0% { opacity: 0; stroke-width: 0.6; }
+  20% { opacity: 1; stroke-width: 3.4; }
+  100% { opacity: 0; stroke-width: 1.2; }
+}
+
+@keyframes turret-hit-burst {
+  0% { opacity: 0; r: 0.5; }
+  25% { opacity: 1; r: 2.4; }
+  100% { opacity: 0; r: 0.5; }
 }
 
 @media (max-height: 700px) {

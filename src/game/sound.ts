@@ -1,6 +1,11 @@
 // === 1. Import 영역 ===
 
 // === 2. 타입 및 상수 영역 ===
+/**
+ * @file sound.ts
+ * @title 게임 효과음
+ * @description 게임 동작에 맞는 효과음을 재생합니다.
+ */
 export type SoundCue = 'click' | 'send' | 'capture' | 'victory' | 'defeat'
 
 const SOUND_CUES: Record<SoundCue, { frequency: number; duration: number }> = {

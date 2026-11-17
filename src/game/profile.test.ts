@@ -1,3 +1,8 @@
+/**
+ * @file profile.test.ts
+ * @title 프로필 로직 테스트
+ * @description 플레이어 설정과 업그레이드 계산을 검증합니다.
+ */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   awardGameReward,

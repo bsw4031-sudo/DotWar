@@ -1,4 +1,9 @@
 // === 1. Import 영역 ===
+/**
+ * @file UpgradeScreen.tsx
+ * @title 업그레이드 화면
+ * @description 보유 크레딧과 업그레이드, 게임 시작 UI를 표시합니다.
+ */
 import OverflowMenuButton from './OverflowMenuButton'
 import {
   getPlayerStats,

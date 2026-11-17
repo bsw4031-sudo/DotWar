@@ -1,3 +1,8 @@
+/**
+ * @file supabase.ts
+ * @title Supabase 데이터 타입
+ * @description 데이터베이스 테이블과 쿼리에 사용하는 TypeScript 타입을 정의합니다.
+ */
 export type Json =
   | string
   | number

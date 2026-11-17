@@ -1,11 +1,17 @@
 // === 1. Import 영역 ===
+/**
+ * @file TerritoryMap.tsx
+ * @title 영토 지도
+ * @description 플레이어와 적의 영토 및 이동 경로를 그립니다.
+ */
+import { useEffect, useRef, useState } from 'react'
 import useTerritoryDrag from '../hooks/useTerritoryDrag'
 import {
   FACTION_LABELS,
   getMovementUnitPositions,
   TURRET_RANGE,
 } from '../game/model'
-import type { Territory, TerritoryLink, TroopMovement } from '../game/model'
+import type { Territory, TerritoryLink, TroopMovement, TurretShot } from '../game/model'
 
 // === 2. 타입 및 상수 영역 ===
 interface TerritoryMapProps {
@@ -14,6 +20,7 @@ interface TerritoryMapProps {
   capacityByFaction: Record<'player' | 'enemy', number>
   links: TerritoryLink[]
   movements: TroopMovement[]
+  turretShots: TurretShot[]
   dispatchingSourceIds: string[]
   selectedSourceId: string | null
   isPaused: boolean
@@ -28,12 +35,15 @@ function TerritoryMap({
   capacityByFaction,
   links,
   movements,
+  turretShots,
   dispatchingSourceIds,
   selectedSourceId,
   isPaused,
   onSelectTerritory,
   onSendTroops,
 }: TerritoryMapProps) {
+  const mapBoardRef = useRef<HTMLDivElement>(null)
+  const [mapAspectRatio, setMapAspectRatio] = useState(1)
   const {
     now,
     dragSourceId,
@@ -51,6 +61,19 @@ function TerritoryMap({
     onSendTroops,
   })
 
+  useEffect(() => {
+    const mapBoard = mapBoardRef.current
+    if (!mapBoard) return
+    const updateAspectRatio = () => {
+      const { width, height } = mapBoard.getBoundingClientRect()
+      if (height > 0) setMapAspectRatio(width / height)
+    }
+    updateAspectRatio()
+    const resizeObserver = new ResizeObserver(updateAspectRatio)
+    resizeObserver.observe(mapBoard)
+    return () => resizeObserver.disconnect()
+  }, [])
+
   // === 4. 이펙트 영역 ===
   // === 5. 이벤트 핸들러 및 내부 함수 영역 ===
   // === 6. 렌더링 영역 ===
@@ -65,6 +88,7 @@ function TerritoryMap({
 
   return (
     <div
+      ref={mapBoardRef}
       className="map-board"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -94,6 +118,7 @@ function TerritoryMap({
             cx={territory.x}
             cy={territory.y}
             r={TURRET_RANGE}
+            transform={`translate(${territory.x} ${territory.y}) scale(1 ${mapAspectRatio}) translate(${-territory.x} ${-territory.y})`}
           />
         ))}
         {links.map((link) => {
@@ -137,6 +162,22 @@ function TerritoryMap({
             markerEnd="url(#troop-arrow-head)"
           />
         )}
+        {turretShots.map((shot) => {
+          const turret = territories.find((territory) => territory.id === shot.turretId)
+          if (!turret) return null
+          return (
+            <g key={shot.id} className="turret-shot-effect">
+              <line
+                className="turret-laser"
+                x1={turret.x}
+                y1={turret.y}
+                x2={shot.targetX}
+                y2={shot.targetY}
+              />
+              <circle className="turret-hit-flash" cx={shot.targetX} cy={shot.targetY} r="2" />
+            </g>
+          )
+        })}
       </svg>
 
       {movements.map((movement) => {

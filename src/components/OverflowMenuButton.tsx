@@ -1,6 +1,11 @@
 // === 1. Import 영역 ===
 
 // === 2. 타입 및 상수 영역 ===
+/**
+ * @file OverflowMenuButton.tsx
+ * @title 더보기 버튼
+ * @description 공용 세 점 메뉴 열기 버튼을 렌더링합니다.
+ */
 interface OverflowMenuButtonProps {
   className?: string
   onClick: () => void
@@ -11,6 +16,7 @@ interface OverflowMenuButtonProps {
  * Renders the shared three-dot menu trigger.
  */
 function OverflowMenuButton({ className = '', onClick }: OverflowMenuButtonProps) {
+  // 더보기 버튼
   return (
     <button
       className={['overflow-menu-button', className].filter(Boolean).join(' ')}

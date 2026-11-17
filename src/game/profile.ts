@@ -1,4 +1,9 @@
 // === 1. Import 영역 ===
+/**
+ * @file profile.ts
+ * @title 플레이어 프로필
+ * @description 플레이어 진행 정보와 업그레이드 저장 로직을 관리합니다.
+ */
 import { STAGE_DEFINITIONS } from './model'
 import type { GameSettings } from './model'
 
@@ -31,6 +36,7 @@ type StoredPlayerProfile = Pick<PlayerProfile, 'credits' | 'upgrades'> & {
 
 const PROFILE_STORAGE_KEY = 'dotwar-player-profile'
 const STARTING_GARRISON = 10
+const GARRISON_PER_UPGRADE_LEVEL = 1
 const STARTING_PRODUCTION_TENTHS = 10
 const STARTING_CAPACITY = 50
 
@@ -46,7 +52,7 @@ export const DEFAULT_PLAYER_PROFILE: PlayerProfile = {
 }
 
 const UPGRADE_DETAILS: Record<UpgradeType, { amount: number }> = {
-  garrison: { amount: 2 },
+  garrison: { amount: GARRISON_PER_UPGRADE_LEVEL },
   production: { amount: 1 },
   capacity: { amount: 1 },
 }

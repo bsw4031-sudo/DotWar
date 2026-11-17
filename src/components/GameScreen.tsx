@@ -1,4 +1,9 @@
 // === 1. Import 영역 ===
+/**
+ * @file GameScreen.tsx
+ * @title 게임 화면
+ * @description 전투 지도와 점령 상태, 게임 조작 UI를 표시합니다.
+ */
 import TerritoryMap from './TerritoryMap'
 import OverflowMenuButton from './OverflowMenuButton'
 import {
@@ -116,6 +121,7 @@ function GameScreen({
           capacityByFaction={capacityByFaction}
           links={gameState.links}
           movements={gameState.movements}
+          turretShots={gameState.turretShots}
           dispatchingSourceIds={dispatchingSourceIds}
           selectedSourceId={selectedSourceId}
           isPaused={isPaused}

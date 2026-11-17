@@ -1,3 +1,8 @@
+/**
+ * @file model.test.ts
+ * @title 게임 규칙 테스트
+ * @description 게임 상태와 전투 규칙이 예상대로 동작하는지 확인합니다.
+ */
 import { describe, expect, it } from 'vitest'
 import {
   createInitialGameState,
