@@ -25,7 +25,7 @@ import {
   getEnemyMoves,
 } from './game/model'
 import { playSoundEffect } from './game/sound'
-import { supabase } from './supabaseClient'
+import { supabase } from './supabaseClient.ts'
 
 // === 2. 타입 및 상수 영역 ===
 type ActiveScreen = 'setup' | 'game'
